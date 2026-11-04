@@ -1,0 +1,6 @@
+@echo off
+echo Starting Sign-to-Speech Smart Glove Server...
+echo Launching dashboard in browser...
+start "" cmd /c "timeout /t 2 /nobreak >nul & start http://127.0.0.1:8000/"
+.\.venv\Scripts\python.exe main.py
+pause

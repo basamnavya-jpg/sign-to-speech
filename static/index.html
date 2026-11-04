@@ -1,0 +1,575 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Sign to Speech &bull; Smart Glove Companion & 3D Gesture Studio</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/static/style.css?v=20261008v3">
+  <!-- Three.js 3D Graphics Engine, OrbitControls & GLTFLoader -->
+  <script src="/static/libs/three.min.js"></script>
+  <script src="/static/libs/OrbitControls.js"></script>
+  <script src="/static/libs/GLTFLoader.js"></script>
+</head>
+
+<body>
+  <div class="app-container">
+
+    <!-- Top Navigation Bar -->
+    <header class="top-nav">
+      <div class="nav-brand">
+        <div class="brand-avatar">S</div>
+        <div class="brand-titles">
+          <h1>Sign to Speech</h1>
+          <span class="brand-sub">Glove companion</span>
+        </div>
+      </div>
+      <div class="nav-actions">
+        <div class="connection-status-pill" id="connStatusPill">
+          <span class="status-dot"></span>
+          <span class="status-text" id="connStatusText">Connected</span>
+        </div>
+        <button class="pill-btn settings-btn" id="btnSettings" onclick="openSettingsModal()" title="Configure system settings">
+          <span class="settings-btn-icon">⚙️</span>
+          <span>Settings</span>
+        </button>
+      </div>
+    </header>
+
+    <!-- Top Action Controls Row 1 -->
+    <div class="controls-row-1">
+      <div class="btn-group-left">
+        <button id="btnToggleSimulatedGlove" class="teal-btn">Stop simulated glove</button>
+        <button id="btnConnectRealGlove" class="outline-pill-btn">Connect real glove</button>
+      </div>
+      <p class="helper-signing-text">
+        Someone is signing with the glove &mdash; text appears as each sign is recognized
+      </p>
+    </div>
+
+    <!-- Action Controls Row 2: Speech & Clear -->
+    <div class="controls-row-2">
+      <button id="btnSpeakCurrentText" class="coral-btn">Speak current text</button>
+      <button id="btnClearText" class="outline-pill-btn">Clear</button>
+      <div class="recognized-phrase-banner" id="recognizedPhraseBanner">
+        <span class="phrase-tag">Active Gesture:</span>
+        <b id="liveActiveGestureLabel">Please wait for me</b>
+      </div>
+    </div>
+
+    <!-- Search / Sentence Translation Input Bar -->
+    <div class="sentence-input-bar">
+      <input type="text" id="sentenceInput" placeholder="Type any sentence to see it signed..." value="Hello, my name is Navya">
+      <button id="btnShowGestures" class="coral-btn">Show gestures</button>
+    </div>
+
+    <!-- 🌟 HERO 3D MODEL HAND STAGE 🌟 -->
+    <section class="hand-3d-stage-card">
+      <div class="stage-header">
+        <div class="stage-title-wrap">
+          <span class="stage-icon">🧤</span>
+          <div>
+            <h2>3D Human Hand Gesture Model</h2>
+            <span class="stage-sub">Realistic anatomical rigged hand with smooth joint kinematics</span>
+          </div>
+        </div>
+        <div class="stage-controls">
+          <!-- Hand Appearance Themes -->
+          <div class="theme-toggles">
+            <span class="theme-label">Style:</span>
+            <button class="theme-btn active" data-theme="skin">Natural Skin</button>
+            <button class="theme-btn" data-theme="glove">Smart Glove</button>
+            <button class="theme-btn" data-theme="ceramic">Ceramic Studio</button>
+          </div>
+          <div class="mode-toggles">
+            <button id="modeSensor" class="stage-pill-btn active">Live Sensor Telemetry</button>
+            <button id="modeLibrary" class="stage-pill-btn">Sign Language Demo</button>
+          </div>
+          <div class="camera-angles">
+            <span class="cam-label">View:</span>
+            <button class="cam-btn" data-cam="front">Front</button>
+            <button class="cam-btn" data-cam="angled">Angled</button>
+            <button class="cam-btn" data-cam="side">Side</button>
+            <button class="cam-btn" data-cam="top">Top</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Quick Pose Action Chips Bar -->
+      <div class="quick-poses-bar">
+        <span class="quick-poses-label">Quick Poses:</span>
+        <button class="quick-pose-chip" data-pose="hello">🖐️ Open Palm</button>
+        <button class="quick-pose-chip" data-pose="yes">✊ Closed Fist</button>
+        <button class="quick-pose-chip" data-pose="iloveyou">🤟 I Love You</button>
+        <button class="quick-pose-chip" data-pose="peace">✌️ Peace / V</button>
+        <button class="quick-pose-chip" data-pose="help">👍 Thumbs Up</button>
+        <button class="quick-pose-chip" data-pose="where">☝️ Pointing</button>
+        <button class="quick-pose-chip" data-pose="water">💧 Water (W)</button>
+        <button class="quick-pose-chip" data-pose="thankyou">🙏 Thank You</button>
+      </div>
+
+      <!-- 3D Canvas Viewport -->
+      <div class="viewport-wrapper">
+        <div id="hand3dContainer" class="three-container"></div>
+
+        <!-- Overlaid Gesture Info HUD -->
+        <div class="gesture-hud-badge">
+          <div class="hud-top-row">
+            <span class="hud-pill">3D LIVE KINEMATICS</span>
+            <span class="hud-confidence" id="hudConfidence">98% Match</span>
+          </div>
+          <h3 id="hudSignTitle">HELLO</h3>
+          <p id="hudSignDesc">Open flat palm waving left and right</p>
+          <div class="hud-progress-bar" id="hudProgressBar" style="display: none;">
+            <div class="hud-progress-fill" id="hudProgressFill"></div>
+          </div>
+        </div>
+
+        <!-- Overlaid Flex Sensor Metrics Gauges -->
+        <div class="sensor-gauges-hud">
+          <span class="hud-section-title">ESP32 Flex Sensors</span>
+          <div class="gauges-mini-row">
+            <div class="g-col"><span class="g-name">Thumb</span><div class="g-bar"><div id="gaugeThumb" class="g-fill" style="height: 35%"></div></div><span id="valThumb" class="g-num">350</span></div>
+            <div class="g-col"><span class="g-name">Index</span><div class="g-bar"><div id="gaugeIndex" class="g-fill" style="height: 52%"></div></div><span id="valIndex" class="g-num">520</span></div>
+            <div class="g-col"><span class="g-name">Middle</span><div class="g-bar"><div id="gaugeMiddle" class="g-fill" style="height: 12%"></div></div><span id="valMiddle" class="g-num">120</span></div>
+            <div class="g-col"><span class="g-name">Ring</span><div class="g-bar"><div id="gaugeRing" class="g-fill" style="height: 10%"></div></div><span id="valRing" class="g-num">100</span></div>
+            <div class="g-col"><span class="g-name">Pinky</span><div class="g-bar"><div id="gaugePinky" class="g-fill" style="height: 8%"></div></div><span id="valPinky" class="g-num">80</span></div>
+          </div>
+          <div class="imu-mini-row">
+            <span>MPU6050 IMU:</span>
+            <span>AX: <b id="valAx">0.1</b></span>
+            <span>AY: <b id="valAy">0.9</b></span>
+            <span>AZ: <b id="valAz">9.8</b></span>
+          </div>
+        </div>
+
+        <div class="orbit-hint">
+          <span>🖱️ Click & drag to rotate 3D hand &bull; Scroll to zoom</span>
+        </div>
+      </div>
+
+      <!-- Exact Dark Navy Status Banner from Screenshot -->
+      <div class="screenshot-gesture-banner-wrap">
+        <div class="screenshot-gesture-banner" id="screenshotGestureBanner">
+          Waiting for gestures...
+        </div>
+      </div>
+    </section>
+
+    <!-- Main Two-Column Grid: Sentences & Words -->
+    <main class="content-split-grid">
+
+      <!-- Left Column: Sentences (40) -->
+      <section class="card content-card sentences-card">
+        <div class="card-title-row">
+          <h3>Sentences <span class="count-badge">(40)</span></h3>
+        </div>
+        <div class="sentences-list" id="sentencesList">
+          <!-- Dynamically populated with 40 phrases -->
+        </div>
+      </section>
+
+      <!-- Right Column: Words (82) -->
+      <section class="card content-card words-card">
+        <div class="card-title-row">
+          <h3>Words <span class="count-badge">(82)</span></h3>
+        </div>
+        <div class="words-pill-grid" id="wordsPillGrid">
+          <!-- All 82 word pills populated dynamically -->
+        </div>
+        <p class="words-footer-note">Words not in this list are fingerspelled letter by letter.</p>
+      </section>
+
+    </main>
+
+    <!-- Bottom Three-Column Dashboard Grid -->
+    <section class="bottom-tri-grid">
+
+      <!-- 1. Recent Sentences -->
+      <div class="card bottom-card recent-sentences-card">
+        <div class="bottom-card-header">
+          <h3>Recent sentences</h3>
+          <span class="badge-num" id="recentCountBadge">2</span>
+        </div>
+        <div class="recent-list" id="recentList">
+          <div class="recent-item">
+            <div class="recent-item-info">
+              <span class="recent-item-text">Please wait for me</span>
+              <span class="recent-item-time">23:40 &bull; glove</span>
+            </div>
+            <span class="live-dot-green"></span>
+          </div>
+          <div class="recent-item">
+            <div class="recent-item-info">
+              <span class="recent-item-text">I go to school every morning</span>
+              <span class="recent-item-time">23:40 &bull; glove</span>
+            </div>
+            <span class="live-dot-green"></span>
+          </div>
+        </div>
+      </div>
+
+      <!-- 2. Bluetooth Diagnostics -->
+      <div class="card bottom-card bt-diagnostics-card">
+        <div class="bottom-card-header">
+          <h3>Bluetooth diagnostics</h3>
+          <span class="badge-healthy">healthy</span>
+        </div>
+        <div class="bt-rows">
+          <div class="bt-row">
+            <span class="bt-label">CONNECTION STATE</span>
+            <span class="bt-value-conn"><span class="live-dot-green inline"></span> Connected</span>
+          </div>
+          <div class="bt-row">
+            <span class="bt-label">DEVICE</span>
+            <span class="bt-value" id="btDeviceName">Sign glove (simulated)</span>
+          </div>
+          <div class="bt-row">
+            <span class="bt-label">LATEST GESTURE</span>
+            <span class="bt-value" id="btLatestGesture">Please wait for me<br><small class="text-sub">&bull; glove &bull; 23:40:43</small></span>
+          </div>
+          <div class="bt-errors-box">
+            <span class="bt-label">CONNECTION ERRORS</span>
+            <p class="bt-error-text">No connection errors this session.</p>
+          </div>
+        </div>
+      </div>
+
+      <!-- 3. Build a Sentence -->
+      <div class="card bottom-card build-sentence-card">
+        <div class="bottom-card-header">
+          <h3>Build a sentence</h3>
+        </div>
+        <p class="build-sentence-intro">
+          Tap gestures in order (or pull in recent ones) and AI turns them into one natural sentence.
+        </p>
+
+        <!-- Quick gesture add tags -->
+        <div class="quick-tags-wrap" id="quickTagsWrap">
+          <button class="quick-tag-chip" data-word="hello">+ hello</button>
+          <button class="quick-tag-chip" data-word="i love you">+ i love you</button>
+          <button class="quick-tag-chip" data-word="water">+ water</button>
+          <button class="quick-tag-chip" data-word="help">+ help</button>
+          <button class="quick-tag-chip" data-word="thank you">+ thank you</button>
+          <button class="quick-tag-chip" data-word="yes">+ yes</button>
+          <button class="quick-tag-chip" data-word="no">+ no</button>
+          <button class="quick-tag-chip" data-word="please">+ please</button>
+        </div>
+
+        <!-- Constructed sentence buffer display -->
+        <div class="build-buffer-box" id="buildBufferBox">
+          <span class="buffer-placeholder" id="bufferPlaceholder">No gestures yet.</span>
+          <div class="buffer-tokens-row" id="bufferTokensRow"></div>
+        </div>
+
+        <div class="build-actions-row">
+          <button id="btnMakeSentence" class="teal-btn sm">Make sentence</button>
+          <button id="btnUseRecent" class="outline-pill-btn sm">Use recent gestures</button>
+        </div>
+        <button id="btnClearBuildBuffer" class="link-clear-btn">Clear</button>
+      </div>
+
+    </section>
+
+    <!-- Footer -->
+    <footer class="app-footer">
+      <span>Sign-to-Speech Smart Glove Micro-Project &bull; FastAPI + WebSockets + Three.js 3D Kinematics</span>
+      <div class="api-links">
+        <a href="/docs" target="_blank">Swagger Docs</a>
+        <code>GET /api/sensors/latest</code>
+        <code>WS /ws/sensors</code>
+        <code>POST /api/translate</code>
+      </div>
+    </footer>
+
+  </div>
+
+  <!-- Settings Modal Dialog -->
+  <div class="modal-backdrop" id="settingsModal" style="display: none;" onclick="if(event.target===this)closeSettingsModal()" role="dialog" aria-modal="true" aria-labelledby="settingsModalTitle">
+    <div class="modal-container">
+      <!-- Modal Header -->
+      <div class="modal-header">
+        <div class="modal-title-wrap">
+          <div class="modal-icon-badge">⚙️</div>
+          <div>
+            <h2 id="settingsModalTitle">Settings & Configuration</h2>
+            <p class="modal-sub">Glove telemetry, speech synthesis, 3D hand visualizer, and hardware controls</p>
+          </div>
+        </div>
+        <button type="button" class="modal-close-btn" id="btnCloseSettings" onclick="closeSettingsModal()" aria-label="Close Settings">&times;</button>
+      </div>
+
+      <!-- Modal Navigation Tabs -->
+      <div class="modal-tabs">
+        <button type="button" class="modal-tab-btn active" data-tab="tab-speech" onclick="switchSettingsTab('tab-speech')">
+          <span>🗣️</span> Speech (TTS)
+        </button>
+        <button type="button" class="modal-tab-btn" data-tab="tab-telemetry" onclick="switchSettingsTab('tab-telemetry')">
+          <span>🧤</span> Telemetry & Stream
+        </button>
+        <button type="button" class="modal-tab-btn" data-tab="tab-visuals" onclick="switchSettingsTab('tab-visuals')">
+          <span>🖐️</span> 3D Hand Model
+        </button>
+        <button type="button" class="modal-tab-btn" data-tab="tab-hardware" onclick="switchSettingsTab('tab-hardware')">
+          <span>📡</span> Glove Hardware
+        </button>
+      </div>
+
+      <!-- Modal Body -->
+      <div class="modal-body">
+        <!-- 1. Speech (TTS) Tab -->
+        <div class="tab-panel active" id="tab-speech">
+          <div class="settings-group">
+            <label class="settings-label" for="settingVoice">
+              <span>Text-to-Speech Voice</span>
+              <small>System synthesized voice used for vocalizing gestures</small>
+            </label>
+            <select id="settingVoice" class="settings-select">
+              <option value="">Default System Voice</option>
+            </select>
+          </div>
+
+          <div class="settings-grid-2">
+            <div class="settings-group">
+              <div class="label-with-value">
+                <label class="settings-label" for="settingRate">Speech Rate (Speed)</label>
+                <span class="value-badge" id="valSettingRate">1.0x</span>
+              </div>
+              <input type="range" id="settingRate" min="0.5" max="2.0" step="0.1" value="1.0" class="settings-slider">
+            </div>
+
+            <div class="settings-group">
+              <div class="label-with-value">
+                <label class="settings-label" for="settingPitch">Voice Pitch</label>
+                <span class="value-badge" id="valSettingPitch">1.0</span>
+              </div>
+              <input type="range" id="settingPitch" min="0.5" max="1.8" step="0.05" value="1.0" class="settings-slider">
+            </div>
+          </div>
+
+          <div class="settings-group">
+            <div class="label-with-value">
+              <label class="settings-label" for="settingVolume">Output Volume</label>
+              <span class="value-badge" id="valSettingVolume">100%</span>
+            </div>
+            <input type="range" id="settingVolume" min="0" max="100" step="5" value="100" class="settings-slider">
+          </div>
+
+          <div class="settings-toggle-row">
+            <div class="toggle-text">
+              <span class="toggle-title">Auto-speak recognized gestures</span>
+              <span class="toggle-desc">Automatically vocalize gestures in real-time when new signs are classified</span>
+            </div>
+            <label class="switch">
+              <input type="checkbox" id="settingAutoSpeak">
+              <span class="slider-toggle"></span>
+            </label>
+          </div>
+
+          <div class="settings-actions-inline">
+            <button type="button" id="btnTestVoice" class="pill-btn sm">
+              🔊 Test Speech ("Hello, my name is Navya")
+            </button>
+          </div>
+        </div>
+
+        <!-- 2. Telemetry & Stream Tab -->
+        <div class="tab-panel" id="tab-telemetry">
+          <div class="settings-group">
+            <label class="settings-label">
+              <span>Telemetry Stream Playback Speed</span>
+              <small>Controls playback rate of 5 Hz ESP32 mock sensor telemetry loop</small>
+            </label>
+            <div class="speed-buttons-row">
+              <button type="button" class="speed-chip-btn" data-speed="0.5">0.5x Slow</button>
+              <button type="button" class="speed-chip-btn active" data-speed="1.0">1.0x Normal</button>
+              <button type="button" class="speed-chip-btn" data-speed="2.0">2.0x Fast</button>
+              <button type="button" class="speed-chip-btn" data-speed="4.0">4.0x Turbo</button>
+            </div>
+          </div>
+
+          <div class="settings-group">
+            <div class="label-with-value">
+              <label class="settings-label" for="settingConfidence">Minimum Recognition Confidence</label>
+              <span class="value-badge" id="valSettingConfidence">80%</span>
+            </div>
+            <input type="range" id="settingConfidence" min="50" max="98" step="1" value="80" class="settings-slider">
+            <small class="helper-text">Gesture classifications below this threshold are filtered out as idle noise.</small>
+          </div>
+
+          <div class="settings-toggle-row">
+            <div class="toggle-text">
+              <span class="toggle-title">Sensor Noise Smoothing</span>
+              <span class="toggle-desc">Low-pass smoothing filter on analog flex sensors (0-1023 ADC)</span>
+            </div>
+            <label class="switch">
+              <input type="checkbox" id="settingSmoothing" checked>
+              <span class="slider-toggle"></span>
+            </label>
+          </div>
+
+          <div class="settings-actions-inline">
+            <button type="button" id="btnRestartStreamer" class="outline-pill-btn sm">
+              🔄 Restart Telemetry Dataset
+            </button>
+          </div>
+        </div>
+
+        <!-- 3. 3D Hand Model Tab -->
+        <div class="tab-panel" id="tab-visuals">
+          <div class="settings-grid-2">
+            <div class="settings-group">
+              <label class="settings-label" for="settingHandTheme">3D Hand Material Style</label>
+              <select id="settingHandTheme" class="settings-select">
+                <option value="skin" selected>Natural Skin</option>
+                <option value="glove">Smart Glove (Tech Wireframe)</option>
+                <option value="ceramic">Ceramic Studio</option>
+              </select>
+            </div>
+
+            <div class="settings-group">
+              <label class="settings-label" for="settingCameraAngle">Default Camera Perspective</label>
+              <select id="settingCameraAngle" class="settings-select">
+                <option value="front">Front View</option>
+                <option value="angled" selected>Angled Perspective</option>
+                <option value="side">Side Profile</option>
+                <option value="top">Top-Down View</option>
+              </select>
+            </div>
+          </div>
+
+          <div class="settings-toggle-row">
+            <div class="toggle-text">
+              <span class="toggle-title">Show Flex Sensor Gauges HUD</span>
+              <span class="toggle-desc">Display real-time 5-finger flex values overlaid on the 3D viewport</span>
+            </div>
+            <label class="switch">
+              <input type="checkbox" id="settingShowGauges" checked>
+              <span class="slider-toggle"></span>
+            </label>
+          </div>
+
+          <div class="settings-toggle-row">
+            <div class="toggle-text">
+              <span class="toggle-title">Show 3D Gesture HUD Badge</span>
+              <span class="toggle-desc">Display active sign title, confidence percentage, and description overlay</span>
+            </div>
+            <label class="switch">
+              <input type="checkbox" id="settingShowHudBadge" checked>
+              <span class="slider-toggle"></span>
+            </label>
+          </div>
+
+          <div class="settings-toggle-row">
+            <div class="toggle-text">
+              <span class="toggle-title">Interactive Orbit Controls Hint</span>
+              <span class="toggle-desc">Display mouse drag rotation and scroll zoom instructions</span>
+            </div>
+            <label class="switch">
+              <input type="checkbox" id="settingShowOrbitHint" checked>
+              <span class="slider-toggle"></span>
+            </label>
+          </div>
+        </div>
+
+        <!-- 4. Glove Hardware Tab -->
+        <div class="tab-panel" id="tab-hardware">
+          <div class="settings-group">
+            <label class="settings-label" for="settingBleName">
+              <span>ESP32 Bluetooth Device Name</span>
+              <small>BLE advertising local name for physical Smart Glove connection</small>
+            </label>
+            <input type="text" id="settingBleName" class="settings-input" value="SmartGlove_ESP32">
+          </div>
+
+          <div class="settings-group">
+            <label class="settings-label" for="settingSampleRate">
+              <span>Sampling Frequency</span>
+              <small>ESP32 ADC reading and BLE notification rate</small>
+            </label>
+            <select id="settingSampleRate" class="settings-select">
+              <option value="5" selected>5 Hz (200ms interval - Standard Balanced)</option>
+              <option value="10">10 Hz (100ms interval - High Speed / Lower Latency)</option>
+              <option value="2">2 Hz (500ms interval - Low Power Mode)</option>
+            </select>
+          </div>
+
+          <div class="settings-group">
+            <label class="settings-label">Hardware Link Telemetry Status</label>
+            <div class="hw-status-box">
+              <div class="hw-row">
+                <span class="hw-label">Backend Streamer:</span>
+                <span class="hw-val-active" id="hwStreamStatus">Online (sensor_data.xlsx)</span>
+              </div>
+              <div class="hw-row">
+                <span class="hw-label">WebSocket Transport:</span>
+                <span class="hw-val-active" id="hwWsStatus">Connected (ws://127.0.0.1:8000/ws/sensors)</span>
+              </div>
+              <div class="hw-row">
+                <span class="hw-label">Sensors Detected:</span>
+                <span>5x Flex (Thumb, Index, Middle, Ring, Pinky) + MPU6050 6-DOF</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Modal Footer -->
+      <div class="modal-footer">
+        <button type="button" id="btnResetSettings" class="link-clear-btn" onclick="resetSettings()">Reset to defaults</button>
+        <div class="footer-actions">
+          <button type="button" id="btnCancelSettings" class="outline-pill-btn" onclick="closeSettingsModal()">Cancel</button>
+          <button type="button" id="btnSaveSettings" class="teal-btn" onclick="saveSettingsFromModal()">Save Changes</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Notification Toast Container -->
+  <div class="toast-notification" id="toastNotification">
+    <span class="toast-icon" id="toastIcon">✓</span>
+    <span class="toast-message" id="toastMessage">Settings saved successfully</span>
+  </div>
+
+  <!-- Scripts with cache busters -->
+  <script src="/static/hand3d.js?v=20261008v3"></script>
+  <script src="/static/app.js?v=20261008v3"></script>
+
+  <!-- Immediate Fail-Safe Script Fallback for Settings Modal -->
+  <script>
+    // Fail-safe definition to guarantee immediate response even before full app.js bundle initialization
+    if (typeof window.openSettingsModal !== 'function') {
+      window.openSettingsModal = function() {
+        var m = document.getElementById('settingsModal');
+        if (m) {
+          m.style.display = 'flex';
+          m.classList.add('open');
+        }
+      };
+    }
+    if (typeof window.closeSettingsModal !== 'function') {
+      window.closeSettingsModal = function() {
+        var m = document.getElementById('settingsModal');
+        if (m) {
+          m.style.display = 'none';
+          m.classList.remove('open');
+        }
+      };
+    }
+    if (typeof window.switchSettingsTab !== 'function') {
+      window.switchSettingsTab = function(tabId) {
+        document.querySelectorAll('.modal-tab-btn').forEach(function(b) {
+          b.classList.toggle('active', b.dataset.tab === tabId);
+        });
+        document.querySelectorAll('.tab-panel').forEach(function(p) {
+          p.classList.toggle('active', p.id === tabId);
+        });
+      };
+    }
+  </script>
+</body>
+
+</html>

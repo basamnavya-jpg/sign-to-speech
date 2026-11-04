@@ -1,0 +1,9 @@
+{
+  "name": "sign-to-speech-smart-glove",
+  "version": "1.0.0",
+  "description": "Sign-to-Speech Smart Glove with 3D Hand Gestures and Live Telemetry",
+  "scripts": {
+    "dev": ".\\.venv\\Scripts\\python.exe main.py",
+    "start": "powershell -Command \"Start-Process 'http://127.0.0.1:8000/'; .\\.venv\\Scripts\\python.exe main.py\""
+  }
+}
